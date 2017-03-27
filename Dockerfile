@@ -1,30 +1,35 @@
-FROM ubuntu:16.04
-MAINTAINER snchan20@yahoo.com
+FROM phusion/baseimage:0.9.19
+MAINTAINER WangYan <i@wangyan.org>
 
-ENV SEAFILE_SERVER_VERSION 6.0.7
-ENV SEAFILE_SERVER_URL https://bintray.com/artifact/download/seafile-org/seafile/seafile-server_${SEAFILE_SERVER_VERSION}_x86-64.tar.gz
+RUN mkdir -p /opt/seafile
+WORKDIR /opt/seafile
 
-ENV TOPDIR /var/seafile
-ENV BINDIR $TOPDIR/seafile-server-${SEAFILE_SERVER_VERSION}
-ENV SHAREDDIR $TOPDIR/shared
+RUN apt-get -y update && apt-get -y install wget apparmor\
+    sudo pwgen net-tools mysql-client libmysqlclient-dev \
+    python2.7 libpython2.7 python-setuptools python-imaging \
+    python-ldap python-mysqldb python-memcache python-urllib3
 
-RUN apt-get update && \
-    apt-get install -y python2.7 libpython2.7 python-setuptools python-imaging python-ldap python-urllib3 sqlite3 wget nano && \
-    apt-get autoremove && apt-get clean && \
-    rm -fr /tmp/* /var/tmp/* /var/lib/apt/lists/* 
-RUN mkdir -p $TOPDIR && cd $TOPDIR && \
-    wget ${SEAFILE_SERVER_URL} && \
-    tar -xzf seafile-server_* && \
-    mkdir installed && \
-    mv seafile-server_* installed 
-    
-ADD conf-scripts/* $BINDIR/
-ADD conf-scripts/seahub/seahub/* $BINDIR/seahub/seahub/
-ADD entry_point.sh $TOPDIR
+# Seafile Config
+ADD ./seafile-download.sh /usr/bin/seafile-download
+ADD ./mysql-setup.sh /usr/bin/mysql-setup
+ADD ./seafile-setup.sh /usr/bin/seafile-setup
+ADD ./seafile-setup-mysql.sh /usr/bin/seafile-setup-mysql
+ADD ./seafile-nginx.sh /usr/bin/seafile-nginx
+ADD ./entrypoint.sh /entrypoint.sh
 
+RUN chmod +x /usr/bin/seafile-download  /usr/bin/seafile-nginx \
+             /usr/bin/seafile-setup  /usr/bin/seafile-setup-mysql \
+             /usr/bin/mysql-setup  /entrypoint.sh
+
+# Expose Ports
 EXPOSE 8082
-EXPOSE 9000
-VOLUME ["/var/seafile/shared"]
+EXPOSE 80
+EXPOSE 443
 
-WORKDIR $BINDIR
-ENTRYPOINT ["/var/seafile/entry_point.sh"]
+# APT Clean
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* ./nginx_signing.key
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["/sbin/my_init"]
